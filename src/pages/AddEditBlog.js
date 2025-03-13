@@ -21,9 +21,9 @@ const initialState = {
   category: "",
   description: "",
   comments: [],
-  likes: []
+  likes: [],
+  imgUrl: "", // ✅ Added imgUrl field
 };
-
 const categoryOption = [
   "Fashion",
   "Technology",
@@ -48,6 +48,7 @@ const AddEditBlog = ({ user, setActive }) => {
     const uploadFile = () => {
       const storageRef = ref(storage, file.name);
       const uploadTask = uploadBytesResumable(storageRef, file);
+
       uploadTask.on(
         "state_changed",
         (snapshot) => {
@@ -55,25 +56,15 @@ const AddEditBlog = ({ user, setActive }) => {
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           console.log("Upload is " + progress + "% done");
           setProgress(progress);
-          switch (snapshot.state) {
-            case "paused":
-              console.log("Upload is paused");
-              break;
-            case "running":
-              console.log("Upload is running");
-              break;
-            default:
-              break;
-          }
         },
         (error) => {
           console.log(error);
         },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadUrl) => {
-            toast.info("Image upload to firebase successfully");
-            setForm((prev) => ({ ...prev, imgUrl: downloadUrl }));
-          });
+        async () => {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          toast.info("Image uploaded to Firebase successfully");
+          setForm((prev) => ({ ...prev, imgUrl: downloadUrl })); // ✅ Store image URL in state
+          setProgress(null);
         }
       );
     };
@@ -113,7 +104,7 @@ const AddEditBlog = ({ user, setActive }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (category && tags && title && description && trending) {
+    if (category && tags && title && description && trending && form.imgUrl) {
       if (!id) {
         try {
           await addDoc(collection(db, "blogs"), {
@@ -140,7 +131,7 @@ const AddEditBlog = ({ user, setActive }) => {
         }
       }
     } else {
-      return toast.error("All fields are mandatory to fill");
+      return toast.error("All fields including image are mandatory to fill");
     }
 
     navigate("/");
@@ -231,11 +222,27 @@ const AddEditBlog = ({ user, setActive }) => {
                   onChange={(e) => setFile(e.target.files[0])}
                 />
               </div>
+              {file && progress !== null && (
+                <div className="progress">
+                  <div
+                    className="progress-bar progress-bar-striped progress-bar-animated"
+                    role="progressbar"
+                    style={{ width: `${progress}%` }}
+                    aria-valuenow={progress}
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  >
+                    {progress < 100
+                      ? `Uploading: ${progress}%`
+                      : "Upload Complete"}
+                  </div>
+                </div>
+              )}
               <div className="col-12 py-3 text-center">
                 <button
                   className="btn btn-add"
                   type="submit"
-                  disabled={progress !== null && progress < 100}
+                  disabled={file && progress !== null && progress < 100}
                 >
                   {id ? "Update" : "Submit"}
                 </button>
